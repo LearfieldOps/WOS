@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>JC Wall of Sound</title>
+<link rel="icon" type="image/png" href="Logo.png">
+    <style>
+        :root {
+            --primary-blue: #3b82f6;
+            --active-green: #22c55e; 
+            --active-bg: #064e3b;    
+            --stop-red: #ef4444;     
+            --card-bg: #1e293b;
+            --body-bg: #0f172a;
+            --header-bg: #1e293bcc;
+            --btn-idle: #334155;
+            --btn-hover: #475569;
+            --text-main: #f1f5f9;
+            --text-dim: #94a3b8;
+            --border-color: #334155;
+            --input-bg: #0f172a;
+        }
+
+        body.light-mode {
+            --primary-blue: #1e40af;
+            --active-green: #16a34a; 
+            --active-bg: #f0fdf4;    
+            --stop-red: #dc2626;     
+            --card-bg: #ffffff;
+            --body-bg: #f1f5f9;
+            --header-bg: #ffffffcc;
+            --btn-idle: #e2e8f0;
+            --btn-hover: #cbd5e1;
+            --text-main: #1e293b;
+            --text-dim: #64748b;
+            --border-color: #e2e8f0;
+            --input-bg: #ffffff;
+        }
+
+        body { font-family: 'Segoe UI', sans-serif; background: var(--body-bg); color: var(--text-main); margin-top: 110px; padding: 15px; transition: margin-top 0.3s; }
+        .search-header { position: fixed; top: 0; left: 0; right: 0; background: var(--header-bg); backdrop-filter: blur(15px); padding: 10px 30px; z-index: 1000; border-bottom: 1px solid var(--border-color); }
+        .header-top-row { display: flex; align-items: center; justify-content: space-between; height: 65px; }
+        .header-clock { font-family: monospace; font-size: 1.1rem; color: var(--primary-blue); background: rgba(0,0,0,0.2); padding: 4px 12px; border-radius: 6px; border: 1px solid var(--border-color); min-width: 145px; text-align: center; }
+        
+        #pinned-outer { border-top: 1px solid var(--border-color); padding: 10px 0; display: none; background: rgba(0,0,0,0.1); margin: 0 -30px; padding-left: 30px; }
+        .school-card { background: var(--card-bg); margin-bottom: 10px; padding: 12px 20px; border-radius: 10px; display: flex; align-items: center; gap: 20px; border: 1px solid var(--border-color); }
+        .school-card.is-playing { border-color: var(--active-green); background: var(--active-bg); }
+        
+        .name-area { min-width: 260px; display: flex; align-items: center; gap: 12px; }
+        .pin-btn { background: none; border: none; cursor: pointer; font-size: 1.2rem; filter: grayscale(1); transition: transform 0.2s; }
+        .pin-btn.active { filter: none; transform: scale(1.1); }
+
+        .refresh-btn {
+            background: var(--btn-idle); border: 1px solid var(--border-color); border-radius: 50%;
+            width: 26px; height: 26px; cursor: pointer; font-size: 0.9em; color: var(--text-dim);
+        }
+
+        .player-box { background: rgba(0,0,0,0.05); padding: 8px; border-radius: 6px; border: 1px solid var(--border-color); min-width: 210px; display: flex; flex-direction: column; gap: 6px; }
+        .vu-meter { width: 100%; height: 18px; background: #000; border-radius: 4px; display: block; }
+        
+        .play-btn { flex: 1; padding: 6px; border-radius: 4px; border: none; font-weight: bold; cursor: pointer; background: var(--btn-idle); color: var(--text-dim); font-size: 0.65rem; text-transform: uppercase; }
+        .play-btn:hover { background: var(--btn-hover); color: var(--text-main); }
+        .play-btn.playing { background: var(--stop-red) !important; color: white !important; }
+        
+        .status-tag { font-size: 0.65rem; font-weight: 900; }
+        .status-offline { color: var(--stop-red); }
+        .status-online { color: var(--active-green); }
+
+        #audio-bank { display: none; }
+    </style>
+</head>
+<body>
+
+    <div id="audio-bank"></div>
+
+    <div class="search-header" id="mainHeader">
+        <div class="header-top-row">
+            <div style="display:flex; align-items:center; gap:15px;">
+                <img src="Logo.png" alt="Logo" style="height:45px;">
+                <div>
+                    <div style="font-weight:900; font-size:1.4rem;">JC Wall of Sound</div>
+                    <div style="font-size:0.6rem; color:var(--text-dim); font-weight: bold;">Ver. 1.03-20.7</div>
+                </div>
+            </div>
+            <div class="header-clock" id="digitalClock">--:--:-- --</div>
+            <div style="display:flex; gap:10px; align-items: center;">
+                <input type="text" id="schoolSearch" placeholder="Filter schools..." oninput="handleSearch(this.value)" style="padding:8px 15px; border-radius:20px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main);">
+                <button onclick="toggleTheme()" class="play-btn" style="padding:8px 15px; color:var(--text-main); min-width: 80px;">🌗 Mode</button>
+                <button onclick="stopAllStreams()" class="play-btn" style="background:var(--stop-red); color:white; padding:8px 15px; min-width: 90px;">Stop All</button>
+            </div>
+        </div>
+        <div id="pinned-outer">
+            <div style="font-size: 0.65rem; font-weight: 900; color: var(--primary-blue); text-transform: uppercase; margin-bottom: 5px;">Pinned Streams</div>
+            <div id="pinned-container" style="display: flex; flex-direction: column;"></div>
+        </div>
+    </div>
+
+    <div class="container" id="list-container"></div>
+
+    <script src="data.js"></script>
+    <script>
+        const audioBank = document.getElementById('audio-bank');
+        const container = document.getElementById('list-container');
+        const pinnedContainer = document.getElementById('pinned-container');
+        const pinnedOuter = document.getElementById('pinned-outer');
+        
+        let audioCtx, activeLS = null;
+        const analysers = {}, sourceNodes = {}, animationIds = {}, peaks = {}, peakTimes = {};
+        let pinnedSchools = [];
+
+        function updateClock() {
+            document.getElementById('digitalClock').textContent = new Date().toLocaleTimeString('en-US', { hour12: true, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        function toggleTheme() { document.body.classList.toggle('light-mode'); }
+
+        function initAudioBank() {
+            schoolData.forEach(item => {
+                ['ls1', 'ls2', 'ls3', 'ls4', 'ls5'].forEach(key => {
+                    if (item[key]) {
+                        const id = item[key];
+                        if (!document.getElementById(`audio-${id}`)) {
+                            const a = document.createElement('audio');
+                            a.id = `audio-${id}`;
+                            a.crossOrigin = "anonymous";
+                            audioBank.appendChild(a);
+                        }
+                    }
+                });
+            });
+        }
+
+        function renderList() {
+            container.innerHTML = ''; pinnedContainer.innerHTML = '';
+            schoolData.forEach(item => {
+                const isPinned = pinnedSchools.includes(item.school);
+                const card = createCard(item, isPinned);
+                if (isPinned) pinnedContainer.appendChild(card); else container.appendChild(card);
+            });
+            pinnedOuter.style.display = pinnedSchools.length > 0 ? 'block' : 'none';
+            if (activeLS) syncUI(activeLS.id, activeLS.server);
+            setTimeout(() => {
+                document.body.style.marginTop = `${document.getElementById('mainHeader').offsetHeight + 20}px`;
+            }, 10);
+        }
+
+        function createCard(item, isPinned) {
+            const card = document.createElement('div');
+            card.className = 'school-card';
+            const cardId = `school-${item.school.replace(/\s+/g, '-').toLowerCase()}`;
+            card.id = cardId;
+            let phtml = '';
+            ['ls1', 'ls2', 'ls3', 'ls4', 'ls5'].forEach(key => {
+                if (item[key]) {
+                    const id = item[key];
+                    phtml += `<div class="player-box" id="box-${id}">
+                        <div style="font-size:0.65rem; font-weight:900; text-align:center; text-transform:uppercase;">${key}: ${id} <span id="status-${id}" class="status-tag"></span></div>
+                        <canvas class="vu-meter" id="vu-${id}" width="200" height="18"></canvas>
+                        <div style="display:flex; gap:5px;">
+                            <button class="play-btn" id="btn1-${id}" onclick="toggleStream('${id}', 1)">Primary</button>
+                            <button class="play-btn" id="btn2-${id}" onclick="toggleStream('${id}', 2)">Backup</button>
+                        </div>
+                    </div>`;
+                }
+            });
+            card.innerHTML = `
+                <div class="name-area">
+                    <button class="pin-btn ${isPinned?'active':''}" onclick="togglePin('${item.school}')">📌</button>
+                    <button class="refresh-btn" onclick="refreshSchool('${cardId}')">↻</button>
+                    <div style="font-weight:800; font-size:1.2rem;">${item.school}</div>
+                </div>
+                <div style="display:flex; gap:10px; flex-wrap:wrap;">${phtml}</div>`;
+            return card;
+        }
+
+        function togglePin(name) {
+            const i = pinnedSchools.indexOf(name);
+            if (i > -1) pinnedSchools.splice(i, 1); else if (pinnedSchools.length < 5) pinnedSchools.push(name);
+            renderList();
+        }
+
+        function toggleStream(id, server) {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            const audio = document.getElementById(`audio-${id}`);
+            
+            if (activeLS && activeLS.id === id && activeLS.server === server) {
+                stopAllStreams(); return;
+            }
+            stopAllStreams();
+
+            // Set up error handling before playing
+            audio.onerror = () => {
+                const st = document.getElementById(`status-${id}`);
+                if (st) { st.innerText = "INACTIVE"; st.className = "status-tag status-offline"; }
+            };
+
+            if (!sourceNodes[id]) {
+                const node = audioCtx.createMediaElementSource(audio);
+                const analyser = audioCtx.createAnalyser();
+                analyser.fftSize = 64;
+                node.connect(analyser);
+                analyser.connect(audioCtx.destination);
+                sourceNodes[id] = node; analysers[id] = analyser;
+            }
+
+            const url = server === 1 ? `https://chi-master1-entry-img1.leanstream-hd.com:2113/${id}-MP3` : `https://hil-master1-entry-img2.leanstream-hd.com:2113/${id}-MP3`;
+            audio.src = `${url}?cb=${Date.now()}`;
+            audio.play().then(() => {
+                activeLS = { id, server };
+                syncUI(id, server);
+            }).catch(e => {
+                const st = document.getElementById(`status-${id}`);
+                if (st) { st.innerText = "INACTIVE"; st.className = "status-tag status-offline"; }
+            });
+        }
+
+        function syncUI(id, server) {
+            const btn = document.getElementById(`btn${server}-${id}`);
+            const box = document.getElementById(`box-${id}`);
+            if (btn) { btn.innerText = "STOP"; btn.classList.add('playing'); }
+            if (box) box.closest('.school-card').classList.add('is-playing');
+            const st = document.getElementById(`status-${id}`);
+            if (st) { st.innerText = "ONLINE"; st.className = "status-tag status-online"; }
+            startVisualizer(id);
+        }
+
+        function stopAllStreams() {
+            activeLS = null;
+            Object.keys(animationIds).forEach(id => {
+                cancelAnimationFrame(animationIds[id]);
+                clearCanvas(id);
+            });
+            document.querySelectorAll('audio').forEach(a => { 
+                a.pause(); a.src = ""; a.load(); a.onerror = null; 
+            });
+            document.querySelectorAll('.play-btn').forEach(b => { 
+                if(b.innerText==="STOP") b.innerText = b.id.includes('btn1') ? "Primary" : "Backup"; 
+                b.classList.remove('playing'); 
+            });
+            document.querySelectorAll('.school-card').forEach(c => c.classList.remove('is-playing'));
+            document.querySelectorAll('.status-tag').forEach(s => s.innerText = "");
+        }
+
+        function clearCanvas(id) {
+            const canvas = document.getElementById(`vu-${id}`);
+            if (canvas) {
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#000';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+            }
+        }
+
+        function startVisualizer(id) {
+            const canvas = document.getElementById(`vu-${id}`);
+            const analyser = analysers[id];
+            if (!canvas || !analyser) return;
+            const ctx = canvas.getContext('2d'), data = new Uint8Array(analyser.frequencyBinCount);
+            peaks[id] = 0; peakTimes[id] = 0;
+
+            function draw() {
+                animationIds[id] = requestAnimationFrame(draw);
+                analyser.getByteFrequencyData(data);
+                let avg = data.reduce((a,b)=>a+b,0)/data.length;
+                ctx.fillStyle='#000'; ctx.fillRect(0,0,200,18);
+                let w = (avg/140)*200; 
+                const now = Date.now();
+
+                if (w >= peaks[id]) { peaks[id] = w; peakTimes[id] = now; } 
+                else if (now - peakTimes[id] > 1000) { peaks[id] -= 1.5; if (peaks[id] < w) peaks[id] = w; }
+
+                const grad = ctx.createLinearGradient(0,0,200,0);
+                grad.addColorStop(0,'#16a34a'); grad.addColorStop(0.8,'#facc15'); grad.addColorStop(1,'#dc2626');
+                ctx.fillStyle=grad; ctx.fillRect(0,0,w,18);
+                if (peaks[id] > 0) { ctx.fillStyle='#fff'; ctx.fillRect(peaks[id]-2, 0, 2, 18); }
+            }
+            draw();
+        }
+
+        function refreshSchool(cardId) {
+            stopAllStreams();
+            const card = document.getElementById(cardId);
+            if (card) {
+                card.style.opacity = "0.4";
+                setTimeout(() => { card.style.opacity = "1"; }, 500);
+            }
+        }
+
+        function handleSearch(q) {
+            const s = q.toLowerCase();
+            container.querySelectorAll('.school-card').forEach(c => {
+                c.style.display = c.innerText.toLowerCase().includes(s) ? 'flex' : 'none';
+            });
+        }
+
+        initAudioBank();
+        renderList();
+        window.addEventListener('resize', () => {
+            document.body.style.marginTop = `${document.getElementById('mainHeader').offsetHeight + 20}px`;
+        });
+    </script>
+</body>
+</html>
