@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>JC Wall of Sound</title>
 <link rel="icon" type="image/png" href="Logo.png">
     <style>
@@ -39,7 +40,7 @@
 
         body { font-family: 'Segoe UI', sans-serif; background: var(--body-bg); color: var(--text-main); margin-top: 110px; padding: 15px; transition: margin-top 0.3s; }
         .search-header { position: fixed; top: 0; left: 0; right: 0; background: var(--header-bg); backdrop-filter: blur(15px); padding: 10px 30px; z-index: 1000; border-bottom: 1px solid var(--border-color); }
-        .header-top-row { display: flex; align-items: center; justify-content: space-between; height: 65px; }
+        .header-top-row { display: flex; align-items: center; justify-content: space-between; height: 65px; gap: 15px; flex-wrap: wrap; }
         .header-clock { font-family: monospace; font-size: 1.1rem; color: var(--primary-blue); background: rgba(0,0,0,0.2); padding: 4px 12px; border-radius: 6px; border: 1px solid var(--border-color); min-width: 145px; text-align: center; }
         
         #pinned-outer { border-top: 1px solid var(--border-color); padding: 10px 0; display: none; background: rgba(0,0,0,0.1); margin: 0 -30px; padding-left: 30px; }
@@ -67,6 +68,18 @@
         .status-online { color: var(--active-green); }
 
         #audio-bank { display: none; }
+
+        /* Mobile View Mode Styles */
+        body.mobile-view { padding: 8px; }
+        body.mobile-view .search-header { padding: 10px 15px; }
+        body.mobile-view .header-top-row { height: auto; padding-bottom: 5px; flex-direction: column; align-items: stretch; gap: 10px; }
+        body.mobile-view .header-clock { display: none; }
+        body.mobile-view .school-card { flex-direction: column; align-items: stretch; gap: 10px; padding: 12px; }
+        body.mobile-view .name-area { min-width: 0; width: 100%; }
+        body.mobile-view .player-box { min-width: 0; width: 100%; box-sizing: border-box; }
+        body.mobile-view #pinned-outer { margin: 0 -15px; padding-left: 15px; padding-right: 15px; }
+        body.mobile-view .controls-wrapper { flex-wrap: wrap; width: 100%; justify-content: space-between; }
+        body.mobile-view #schoolSearch { flex: 1; min-width: 140px; }
     </style>
 </head>
 <body>
@@ -83,8 +96,9 @@
                 </div>
             </div>
             <div class="header-clock" id="digitalClock">--:--:-- --</div>
-            <div style="display:flex; gap:10px; align-items: center;">
+            <div class="controls-wrapper" style="display:flex; gap:10px; align-items: center;">
                 <input type="text" id="schoolSearch" placeholder="Filter schools..." oninput="handleSearch(this.value)" style="padding:8px 15px; border-radius:20px; border:1px solid var(--border-color); background:var(--input-bg); color:var(--text-main);">
+                <button onclick="toggleMobileView()" id="mobileToggleBtn" class="play-btn" style="padding:8px 15px; color:var(--text-main); min-width: 80px;">📱 Mobile</button>
                 <button onclick="toggleTheme()" class="play-btn" style="padding:8px 15px; color:var(--text-main); min-width: 80px;">🌗 Mode</button>
                 <button onclick="stopAllStreams()" class="play-btn" style="background:var(--stop-red); color:white; padding:8px 15px; min-width: 90px;">Stop All</button>
             </div>
@@ -116,6 +130,19 @@
 
         function toggleTheme() { document.body.classList.toggle('light-mode'); }
 
+        function toggleMobileView() {
+            document.body.classList.toggle('mobile-view');
+            const isMobile = document.body.classList.contains('mobile-view');
+            const btn = document.getElementById('mobileToggleBtn');
+            btn.style.background = isMobile ? 'var(--primary-blue)' : 'var(--btn-idle)';
+            btn.style.color = isMobile ? 'white' : 'var(--text-main)';
+            adjustHeaderMargin();
+        }
+
+        function adjustHeaderMargin() {
+            document.body.style.marginTop = `${document.getElementById('mainHeader').offsetHeight + 20}px`;
+        }
+
         function initAudioBank() {
             schoolData.forEach(item => {
                 ['ls1', 'ls2', 'ls3', 'ls4', 'ls5'].forEach(key => {
@@ -141,9 +168,7 @@
             });
             pinnedOuter.style.display = pinnedSchools.length > 0 ? 'block' : 'none';
             if (activeLS) syncUI(activeLS.id, activeLS.server);
-            setTimeout(() => {
-                document.body.style.marginTop = `${document.getElementById('mainHeader').offsetHeight + 20}px`;
-            }, 10);
+            setTimeout(adjustHeaderMargin, 10);
         }
 
         function createCard(item, isPinned) {
@@ -171,7 +196,7 @@
                     <button class="refresh-btn" onclick="refreshSchool('${cardId}')">↻</button>
                     <div style="font-weight:800; font-size:1.2rem;">${item.school}</div>
                 </div>
-                <div style="display:flex; gap:10px; flex-wrap:wrap;">${phtml}</div>`;
+                <div class="players-wrapper" style="display:flex; gap:10px; flex-wrap:wrap; flex:1;">${phtml}</div>`;
             return card;
         }
 
@@ -190,7 +215,6 @@
             }
             stopAllStreams();
 
-            // Set up error handling before playing
             audio.onerror = () => {
                 const st = document.getElementById(`status-${id}`);
                 if (st) { st.innerText = "INACTIVE"; st.className = "status-tag status-offline"; }
@@ -296,9 +320,7 @@
 
         initAudioBank();
         renderList();
-        window.addEventListener('resize', () => {
-            document.body.style.marginTop = `${document.getElementById('mainHeader').offsetHeight + 20}px`;
-        });
+        window.addEventListener('resize', adjustHeaderMargin);
     </script>
 </body>
 </html>
